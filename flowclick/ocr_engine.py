@@ -58,6 +58,25 @@ class OCREngine:
         min_score: float = 0.5,
         offset: tuple[int, int] = (0, 0),
     ) -> TextMatch | None:
+        matches = self.find_texts(
+            image,
+            [target],
+            match_mode=match_mode,
+            min_score=min_score,
+            offset=offset,
+        )
+        return matches.get(target)
+
+    def find_texts(
+        self,
+        image: Any,
+        targets: list[str],
+        *,
+        match_mode: str = "contains",
+        min_score: float = 0.5,
+        offset: tuple[int, int] = (0, 0),
+    ) -> dict[str, TextMatch]:
+        """Recognize once and return the best match for each requested target."""
         try:
             import numpy as np
         except ImportError as exc:
@@ -69,25 +88,30 @@ class OCREngine:
         texts = getattr(result, "txts", None)
         scores = getattr(result, "scores", None)
         if boxes is None or texts is None or scores is None:
-            return None
+            return {}
 
-        found: list[TextMatch] = []
+        found: dict[str, list[TextMatch]] = {target: [] for target in targets}
         offset_x, offset_y = offset
         for raw_box, raw_text, raw_score in zip(boxes, texts, scores):
             text = str(raw_text)
             score = float(raw_score)
-            if score < min_score or not _matches(text, target, match_mode):
+            if score < min_score:
                 continue
             points = tuple((float(point[0]), float(point[1])) for point in raw_box)
             xs = [point[0] for point in points]
             ys = [point[1] for point in points]
-            found.append(
-                TextMatch(
-                    text=text,
-                    score=score,
-                    center_x=round(sum(xs) / len(xs)) + offset_x,
-                    center_y=round(sum(ys) / len(ys)) + offset_y,
-                    box=points,
-                )
+            match = TextMatch(
+                text=text,
+                score=score,
+                center_x=round(sum(xs) / len(xs)) + offset_x,
+                center_y=round(sum(ys) / len(ys)) + offset_y,
+                box=points,
             )
-        return max(found, key=lambda item: item.score, default=None)
+            for target in targets:
+                if _matches(text, target, match_mode):
+                    found[target].append(match)
+        return {
+            target: max(items, key=lambda item: item.score)
+            for target, items in found.items()
+            if items
+        }

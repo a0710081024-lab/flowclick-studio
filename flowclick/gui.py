@@ -164,6 +164,7 @@ class FlowClickApp:
             "• 点击步骤后可上下移动\n"
             "• 坐标点击支持 3 秒录制\n"
             "• 文字识别支持中英文\n"
+            "• 文字结果可提前跳出循环\n"
             "• 图片步骤请选择小范围特征图\n"
             "• 循环开始和结束必须成对"
         )
@@ -443,7 +444,7 @@ class FlowClickApp:
     def _show_about(self) -> None:
         messagebox.showinfo(
             "关于 FlowClick Studio",
-            "FlowClick Studio 0.1.0\n\n"
+            "FlowClick Studio 0.2.0\n\n"
             "本地可视化操作流程工具。普通坐标点击不依赖网络；文字识别首次加载可能需要数秒。",
             parent=self.root,
         )

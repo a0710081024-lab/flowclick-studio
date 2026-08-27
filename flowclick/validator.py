@@ -70,8 +70,9 @@ def validate_workflow(workflow: Workflow) -> list[ValidationIssue]:
         issues.append(ValidationIssue(None, "流程中还没有步骤"))
         return issues
 
+    loop_map: dict[int, int] = {}
     try:
-        build_loop_map(workflow.steps)
+        loop_map = build_loop_map(workflow.steps)
     except ValueError as exc:
         issues.append(ValidationIssue(None, str(exc)))
 
@@ -112,6 +113,18 @@ def validate_workflow(workflow: Workflow) -> list[ValidationIssue]:
                 error = "请填写要识别的文字"
             else:
                 error = _positive_number(p, "timeout", "超时时间")
+        elif step.action == "wait_text_choice":
+            continue_text = str(p.get("continue_text", "")).strip()
+            break_text = str(p.get("break_text", "")).strip()
+            if not continue_text or not break_text:
+                error = "请同时填写正常继续文字和提前结束文字"
+            elif "".join(continue_text.casefold().split()) == "".join(break_text.casefold().split()):
+                error = "两个结果文字不能相同"
+            else:
+                error = _positive_number(p, "timeout", "超时时间")
+            inside_loop = any(start < index < end for start, end in loop_map.items() if start < end)
+            if not inside_loop:
+                error = "必须放在循环开始和循环结束之间"
         elif step.action in {"wait_image", "click_image"}:
             if not str(p.get("path", "")).strip():
                 error = "请选择要识别的图片"
@@ -130,7 +143,7 @@ def validate_workflow(workflow: Workflow) -> list[ValidationIssue]:
             except (TypeError, ValueError):
                 error = "循环次数必须是整数"
 
-        if step.action in {"wait_text", "click_text", "wait_image", "click_image"}:
+        if step.action in {"wait_text", "click_text", "wait_text_choice", "wait_image", "click_image"}:
             try:
                 parse_region(p.get("region", ""))
             except ValueError as exc:

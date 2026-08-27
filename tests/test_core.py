@@ -56,6 +56,28 @@ class CoreTests(unittest.TestCase):
         self.assertIn("(100, 200)", step_summary(step))
         self.assertIn("× 2", step_summary(step))
 
+    def test_text_choice_must_be_inside_loop(self):
+        choice = Step.create("wait_text_choice")
+        workflow = Workflow(steps=[choice])
+        messages = [issue.display() for issue in validate_workflow(workflow)]
+        self.assertTrue(any("必须放在循环开始" in message for message in messages))
+
+    def test_text_choice_is_valid_inside_loop(self):
+        workflow = Workflow(
+            steps=[
+                Step.create("loop_start"),
+                Step.create("wait_text_choice"),
+                Step.create("loop_end"),
+            ]
+        )
+        self.assertEqual(validate_workflow(workflow), [])
+
+    def test_text_choice_summary_lists_both_results(self):
+        choice = Step.create("wait_text_choice")
+        summary = step_summary(choice)
+        self.assertIn("自动隐藏", summary)
+        self.assertIn("前往开箱", summary)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -34,12 +34,12 @@ jobs:
 
       - name: Create download archive
         shell: powershell
-        run: Compress-Archive -Path dist\FlowClickStudio -DestinationPath FlowClickStudio-windows-x64.zip -Force
+        run: Compress-Archive -Path dist\FlowClickStudio -DestinationPath FlowClickStudio-v0.2.0-windows-x64.zip -Force
 
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: FlowClickStudio-windows-x64
-          path: FlowClickStudio-windows-x64.zip
+          name: FlowClickStudio-v0.2.0-windows-x64
+          path: FlowClickStudio-v0.2.0-windows-x64.zip
           if-no-files-found: error
           retention-days: 30

@@ -25,12 +25,12 @@ call .venv\Scripts\pyinstaller.exe --noconfirm --clean FlowClick.spec
 if errorlevel 1 goto :failed
 
 if not exist output mkdir output
-if exist "output\FlowClickStudio-windows-x64.zip" del /q "output\FlowClickStudio-windows-x64.zip"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path 'dist\FlowClickStudio' -DestinationPath 'output\FlowClickStudio-windows-x64.zip' -Force"
+if exist "output\FlowClickStudio-v0.2.0-windows-x64.zip" del /q "output\FlowClickStudio-v0.2.0-windows-x64.zip"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path 'dist\FlowClickStudio' -DestinationPath 'output\FlowClickStudio-v0.2.0-windows-x64.zip' -Force"
 if errorlevel 1 goto :failed
 
 echo.
-echo 构建完成：output\FlowClickStudio-windows-x64.zip
+echo 构建完成：output\FlowClickStudio-v0.2.0-windows-x64.zip
 pause
 exit /b 0
 

@@ -14,6 +14,7 @@ ACTION_LABELS: dict[str, str] = {
     "type_text": "输入文字",
     "wait_text": "等待文字",
     "click_text": "识别文字并点击",
+    "wait_text_choice": "等待文字结果",
     "wait_image": "等待图片",
     "click_image": "识别图片并点击",
     "loop_start": "循环开始",
@@ -46,6 +47,16 @@ DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
         "region": "",
         "min_score": 0.5,
         "button": "left",
+        "on_timeout": "stop",
+    },
+    "wait_text_choice": {
+        "continue_text": "自动隐藏",
+        "break_text": "前往开箱",
+        "match": "contains",
+        "timeout": 60.0,
+        "poll": 0.7,
+        "region": "",
+        "min_score": 0.5,
         "on_timeout": "stop",
     },
     "wait_image": {
@@ -153,6 +164,11 @@ def step_summary(step: Step) -> str:
         return (text[:32] + "…") if len(text) > 32 else text
     if action in {"wait_text", "click_text"}:
         return f"“{p.get('text', '')}” · 最长 {p.get('timeout', 0)} 秒"
+    if action == "wait_text_choice":
+        return (
+            f"继续“{p.get('continue_text', '')}” / "
+            f"跳出“{p.get('break_text', '')}” · 最长 {p.get('timeout', 0)} 秒"
+        )
     if action in {"wait_image", "click_image"}:
         return f"{p.get('path', '')} · 相似度 {p.get('confidence', 0.85)}"
     if action == "loop_start":

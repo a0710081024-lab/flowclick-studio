@@ -12,6 +12,9 @@ class RecordingRunner(WorkflowRunner):
 
     def _execute(self, step, workflow):
         self.executed.append(str(step.params.get("text", step.action)))
+        if step.action == "wait_text_choice":
+            return "break_loop"
+        return None
 
 
 class RunnerTests(unittest.TestCase):
@@ -40,6 +43,26 @@ class RunnerTests(unittest.TestCase):
         runner.start(Workflow(steps=[disabled, enabled]))
         self.assertTrue(finished.wait(2), "runner did not finish")
         self.assertEqual(runner.executed, ["enabled"])
+
+    def test_text_choice_can_break_current_loop(self):
+        finished = threading.Event()
+        runner = RecordingRunner(finished)
+        start = Step.create("loop_start")
+        start.params["count"] = 5
+        before = Step.create("comment")
+        before.params["text"] = "before"
+        choice = Step.create("wait_text_choice")
+        skipped = Step.create("comment")
+        skipped.params["text"] = "must-not-run"
+        after = Step.create("comment")
+        after.params["text"] = "after-loop"
+        workflow = Workflow(
+            steps=[start, before, choice, skipped, Step.create("loop_end"), after]
+        )
+
+        runner.start(workflow)
+        self.assertTrue(finished.wait(2), "runner did not finish")
+        self.assertEqual(runner.executed, ["before", "wait_text_choice", "after-loop"])
 
 
 if __name__ == "__main__":

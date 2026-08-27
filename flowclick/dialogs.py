@@ -67,6 +67,16 @@ FIELDS: dict[str, list[FieldSpec]] = {
         FieldSpec("button", "鼠标按键", "choice", BUTTONS),
         FieldSpec("on_timeout", "超时后", "choice", TIMEOUTS),
     ],
+    "wait_text_choice": [
+        FieldSpec("continue_text", "正常继续文字", hint="识别到它时继续执行循环内的下一步"),
+        FieldSpec("break_text", "提前结束文字", hint="识别到它时立即跳到循环结束之后"),
+        FieldSpec("match", "匹配方式", "choice", MATCHES),
+        FieldSpec("timeout", "最长等待（秒）", "float"),
+        FieldSpec("poll", "识别间隔（秒）", "float"),
+        FieldSpec("region", "识别区域", hint="可留空；格式：x,y,宽,高"),
+        FieldSpec("min_score", "最低文字置信度", "float"),
+        FieldSpec("on_timeout", "超时后", "choice", TIMEOUTS),
+    ],
     "wait_image": [
         FieldSpec("path", "图片文件", "file"),
         FieldSpec("confidence", "最低相似度", "float"),

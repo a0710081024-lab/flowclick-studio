@@ -142,7 +142,20 @@ class WorkflowRunner:
                         pc += 1
                     continue
 
-                self._execute(step, workflow)
+                control = self._execute(step, workflow)
+                if control == "break_loop":
+                    active_starts = [
+                        start
+                        for start in remaining
+                        if start < pc < loop_map.get(start, -1)
+                    ]
+                    if not active_starts:
+                        raise WorkflowRuntimeError("“等待文字结果”必须放在循环开始和结束之间")
+                    start = max(active_starts)
+                    remaining.pop(start, None)
+                    pc = loop_map[start] + 1
+                    self.on_status("识别到提前结束文字，已跳出循环")
+                    continue
                 pc += 1
             self.on_status("流程执行完成")
         except InterruptedError:
@@ -153,7 +166,7 @@ class WorkflowRunner:
         finally:
             self.on_finished(error)
 
-    def _execute(self, step: Step, workflow: Workflow) -> None:
+    def _execute(self, step: Step, workflow: Workflow) -> str | None:
         p = step.params
         action = step.action
         gui = self._pyautogui() if action not in {"wait", "comment"} else None
@@ -205,6 +218,8 @@ class WorkflowRunner:
             if match is not None and action == "click_text":
                 assert gui is not None
                 gui.click(match.center_x, match.center_y, button=str(p.get("button", "left")))
+        elif action == "wait_text_choice":
+            return self._wait_for_text_choice(p)
         elif action in {"wait_image", "click_image"}:
             box = self._wait_for_image(p, workflow)
             if box is not None and action == "click_image":
@@ -213,6 +228,7 @@ class WorkflowRunner:
                 gui.click(point.x, point.y, button=str(p.get("button", "left")))
         else:
             raise WorkflowRuntimeError(f"不支持的操作：{action}")
+        return None
 
     def _wait_for_text(self, params: dict[str, Any]) -> TextMatch | None:
         gui = self._pyautogui()
@@ -258,6 +274,35 @@ class WorkflowRunner:
                 return box
             self._sleep(float(params.get("poll", 0.5)))
         return self._timeout_result(params, f"未在规定时间内识别到图片“{Path(image_path).name}”")
+
+    def _wait_for_text_choice(self, params: dict[str, Any]) -> str | None:
+        gui = self._pyautogui()
+        region = parse_region(params.get("region", ""))
+        offset = (region[0], region[1]) if region else (0, 0)
+        deadline = time.monotonic() + float(params.get("timeout", 60))
+        continue_text = str(params.get("continue_text", ""))
+        break_text = str(params.get("break_text", ""))
+        targets = [break_text, continue_text]
+        while time.monotonic() <= deadline:
+            self._wait_if_paused()
+            screenshot = gui.screenshot(region=region)
+            matches = self._ocr.find_texts(
+                screenshot,
+                targets,
+                match_mode=str(params.get("match", "contains")),
+                min_score=float(params.get("min_score", 0.5)),
+                offset=offset,
+            )
+            # 两个结果同时出现时，优先保证“提前结束”不被错过。
+            if break_text in matches:
+                return "break_loop"
+            if continue_text in matches:
+                return None
+            self._sleep(float(params.get("poll", 0.7)))
+        return self._timeout_result(
+            params,
+            f"未在规定时间内识别到“{continue_text}”或“{break_text}”",
+        )
 
     @staticmethod
     def _timeout_result(params: dict[str, Any], message: str) -> None:

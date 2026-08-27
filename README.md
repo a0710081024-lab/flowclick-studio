@@ -9,7 +9,7 @@
 - 键盘操作：单键、组合键、自动输入或剪贴板粘贴
 - 文字识别：等待指定中英文出现，或识别后点击文字中心
 - 图片识别：等待小图片出现，或识别后点击图片中心
-- 流程控制：成对循环、超时停止或跳过
+- 流程控制：成对循环、超时停止或跳过、根据 OCR 结果提前跳出循环
 - 坐标录制：编辑点击步骤时，3 秒后读取鼠标位置
 - 配置管理：每套流程保存为独立 JSON 文件
 - 全局快捷键：F8 开始、F9 暂停/继续、F10 停止
@@ -19,7 +19,7 @@
 
 ### 使用打包好的 EXE
 
-1. 下载 `FlowClickStudio-windows-x64.zip`。
+1. 下载最新的 `FlowClickStudio-v0.2.0-windows-x64.zip`。
 2. 右键选择“全部解压缩”。
 3. 保留整个 `FlowClickStudio` 文件夹，不要只移动其中的 EXE。
 4. 双击 `FlowClickStudio.exe`。
@@ -39,6 +39,15 @@
 4. 双击列表中的步骤可重新编辑，使用“上移/下移”调整顺序。
 5. 循环必须由“循环开始”和“循环结束”包住需要重复的步骤。
 6. 点击“检查流程”，通过后保存并运行。
+
+### 根据文字结果提前结束循环
+
+把“等待文字结果”放在“循环开始”和“循环结束”之间：
+
+- 识别到“正常继续文字”：执行循环内的下一步。
+- 识别到“提前结束文字”：跳过循环内的剩余步骤，直接执行“循环结束”之后的步骤。
+
+这个步骤必须放在循环内。如果同一画面同时出现两种文字，会优先执行“提前结束”，避免继续误操作。
 
 一个流程文件大致如下：
 
@@ -74,11 +83,11 @@ RapidOCR 官方当前推荐使用 `pip install rapidocr onnxruntime`，默认模
 1. 安装构建依赖；
 2. 运行自动测试；
 3. 使用 PyInstaller 生成文件夹版 EXE；
-4. 输出 `output\FlowClickStudio-windows-x64.zip`。
+4. 输出 `output\FlowClickStudio-v0.2.0-windows-x64.zip`。
 
 ### 使用 GitHub Actions
 
-将代码推送到 GitHub 的 `main` 分支后，打开仓库的 **Actions → Build Windows EXE → Run workflow**。完成后从页面底部的 **Artifacts** 下载 `FlowClickStudio-windows-x64`。
+将代码推送到 GitHub 的 `main` 分支后，打开仓库的 **Actions → Build Windows EXE → Run workflow**。完成后从页面底部的 **Artifacts** 下载 `FlowClickStudio-v0.2.0-windows-x64`。
 
 文件夹版比强行压成单文件更适合包含 OCR 模型的程序：启动更快，也更容易排查被安全软件误拦截的文件。
 
