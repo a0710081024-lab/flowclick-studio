@@ -1,0 +1,46 @@
+import threading
+import unittest
+
+from flowclick.automation import WorkflowRunner
+from flowclick.models import Step, Workflow
+
+
+class RecordingRunner(WorkflowRunner):
+    def __init__(self, finished: threading.Event):
+        super().__init__(on_finished=lambda _error: finished.set())
+        self.executed: list[str] = []
+
+    def _execute(self, step, workflow):
+        self.executed.append(str(step.params.get("text", step.action)))
+
+
+class RunnerTests(unittest.TestCase):
+    def test_loop_executes_body_requested_number_of_times(self):
+        finished = threading.Event()
+        runner = RecordingRunner(finished)
+        start = Step.create("loop_start")
+        start.params["count"] = 3
+        body = Step.create("comment")
+        body.params["text"] = "body"
+        workflow = Workflow(steps=[start, body, Step.create("loop_end")])
+
+        runner.start(workflow)
+        self.assertTrue(finished.wait(2), "runner did not finish")
+        self.assertEqual(runner.executed, ["body", "body", "body"])
+
+    def test_disabled_steps_are_skipped(self):
+        finished = threading.Event()
+        runner = RecordingRunner(finished)
+        disabled = Step.create("comment")
+        disabled.params["text"] = "disabled"
+        disabled.enabled = False
+        enabled = Step.create("comment")
+        enabled.params["text"] = "enabled"
+
+        runner.start(Workflow(steps=[disabled, enabled]))
+        self.assertTrue(finished.wait(2), "runner did not finish")
+        self.assertEqual(runner.executed, ["enabled"])
+
+
+if __name__ == "__main__":
+    unittest.main()

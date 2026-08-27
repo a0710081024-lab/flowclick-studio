@@ -1,0 +1,5 @@
+[project]
+name = "flowclick-studio"
+version = "0.1.0"
+description = "Windows visual workflow automation and OCR click tool"
+requires-python = ">=3.11,<3.13"
