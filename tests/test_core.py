@@ -78,6 +78,23 @@ class CoreTests(unittest.TestCase):
         self.assertIn("自动隐藏", summary)
         self.assertIn("前往开箱", summary)
 
+    def test_text_router_requires_existing_label(self):
+        router = Step.create("text_router")
+        router.params["routes"] = "领取=>领奖"
+        messages = [issue.display() for issue in validate_workflow(Workflow(steps=[router]))]
+        self.assertTrue(any("找不到目标标签" in message for message in messages))
+
+    def test_text_router_with_label_is_valid(self):
+        router = Step.create("text_router")
+        router.params["routes"] = "领取=>领奖"
+        label = Step.create("label")
+        label.params["name"] = "领奖"
+        self.assertEqual(validate_workflow(Workflow(steps=[router, label])), [])
+
+    def test_watchdog_defaults_are_valid(self):
+        workflow = Workflow(steps=[Step.create("watchdog"), Step.create("wait")])
+        self.assertEqual(validate_workflow(workflow), [])
+
 
 if __name__ == "__main__":
     unittest.main()

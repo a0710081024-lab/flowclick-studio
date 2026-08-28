@@ -17,6 +17,14 @@ class RecordingRunner(WorkflowRunner):
         return None
 
 
+class RoutingRunner(RecordingRunner):
+    def _execute(self, step, workflow):
+        self.executed.append(str(step.params.get("text", step.action)))
+        if step.action == "text_router":
+            return "jump:领奖"
+        return None
+
+
 class RunnerTests(unittest.TestCase):
     def test_loop_executes_body_requested_number_of_times(self):
         finished = threading.Event()
@@ -63,6 +71,29 @@ class RunnerTests(unittest.TestCase):
         runner.start(workflow)
         self.assertTrue(finished.wait(2), "runner did not finish")
         self.assertEqual(runner.executed, ["before", "wait_text_choice", "after-loop"])
+
+    def test_text_router_skips_to_named_label_and_exits_inner_loop(self):
+        finished = threading.Event()
+        runner = RoutingRunner(finished)
+        outer = Step.create("loop_start")
+        outer.params["count"] = 1
+        inner = Step.create("loop_start")
+        inner.params["count"] = 5
+        router = Step.create("text_router")
+        router.params["routes"] = "领取=>领奖"
+        skipped = Step.create("comment")
+        skipped.params["text"] = "must-not-run"
+        label = Step.create("label")
+        label.params["name"] = "领奖"
+        after = Step.create("comment")
+        after.params["text"] = "after-jump"
+        workflow = Workflow(
+            steps=[outer, inner, router, skipped, Step.create("loop_end"), label, after, Step.create("loop_end")]
+        )
+
+        runner.start(workflow)
+        self.assertTrue(finished.wait(2), "runner did not finish")
+        self.assertEqual(runner.executed, ["text_router", "label", "after-jump"])
 
 
 if __name__ == "__main__":

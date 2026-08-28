@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import os
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -69,6 +70,8 @@ class FlowClickApp:
         run_menu.add_command(label="开始   F8", command=self.start)
         run_menu.add_command(label="暂停/继续   F9", command=self.pause)
         run_menu.add_command(label="停止   F10", command=self.stop)
+        run_menu.add_separator()
+        run_menu.add_command(label="打开托管恢复记录", command=self._open_recovery_folder)
         menu.add_cascade(label="运行", menu=run_menu)
 
         help_menu = tk.Menu(menu, tearoff=False)
@@ -165,6 +168,8 @@ class FlowClickApp:
             "• 坐标点击支持 3 秒录制\n"
             "• 文字识别支持中英文\n"
             "• 文字结果可提前跳出循环\n"
+            "• 页面状态可跳到指定流程标签\n"
+            "• 托管看门狗可在卡住时自动恢复\n"
             "• 图片步骤请选择小范围特征图\n"
             "• 循环开始和结束必须成对"
         )
@@ -333,6 +338,14 @@ class FlowClickApp:
     def stop(self) -> None:
         self.runner.stop()
 
+    def _open_recovery_folder(self) -> None:
+        path = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "FlowClickStudio" / "recovery"
+        path.mkdir(parents=True, exist_ok=True)
+        try:
+            os.startfile(path)  # type: ignore[attr-defined]
+        except Exception as exc:
+            messagebox.showerror("无法打开恢复记录", str(exc), parent=self.root)
+
     def _highlight_step(self, index: int) -> None:
         for item in self.tree.get_children():
             tags = list(self.tree.item(item, "tags"))
@@ -444,7 +457,7 @@ class FlowClickApp:
     def _show_about(self) -> None:
         messagebox.showinfo(
             "关于 FlowClick Studio",
-            "FlowClick Studio 0.2.0\n\n"
+            "FlowClick Studio 0.3.0\n\n"
             "本地可视化操作流程工具。普通坐标点击不依赖网络；文字识别首次加载可能需要数秒。",
             parent=self.root,
         )

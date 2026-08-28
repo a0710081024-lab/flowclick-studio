@@ -21,6 +21,7 @@ class FieldSpec:
 BUTTONS = (("左键", "left"), ("右键", "right"), ("中键", "middle"))
 TIMEOUTS = (("停止流程", "stop"), ("跳过此步", "skip"))
 MATCHES = (("包含目标文字", "contains"), ("完全一致", "exact"))
+RECOVERY_MODES = (("只重启当前流程", "restart_workflow"), ("重启指定程序后再运行流程", "restart_program"))
 
 
 FIELDS: dict[str, list[FieldSpec]] = {
@@ -93,6 +94,38 @@ FIELDS: dict[str, list[FieldSpec]] = {
         FieldSpec("region", "识别区域", hint="可留空；格式：x,y,宽,高"),
         FieldSpec("button", "鼠标按键", "choice", BUTTONS),
         FieldSpec("on_timeout", "超时后", "choice", TIMEOUTS),
+    ],
+    "text_router": [
+        FieldSpec(
+            "routes",
+            "页面文字与目标标签",
+            "multiline",
+            hint="每行一条，格式：领取=>领奖。识别不到任何文字时继续下一步",
+        ),
+        FieldSpec("match", "匹配方式", "choice", MATCHES),
+        FieldSpec("timeout", "最多检查（秒）", "float"),
+        FieldSpec("poll", "识别间隔（秒）", "float"),
+        FieldSpec("region", "识别区域", hint="可留空；格式：x,y,宽,高"),
+        FieldSpec("min_score", "最低文字置信度", "float"),
+    ],
+    "label": [FieldSpec("name", "标签名称", hint="例如：开箱、领奖、再来")],
+    "watchdog": [
+        FieldSpec("stuck_seconds", "画面不变多久算卡住（秒）", "float", hint="建议 60 到 120 秒"),
+        FieldSpec("sample_interval", "检查间隔（秒）", "float", hint="建议 2 到 5 秒"),
+        FieldSpec("region", "监控区域", hint="可留空监控全屏；格式：x,y,宽,高"),
+        FieldSpec(
+            "watch_texts",
+            "重点监控文字",
+            "multiline",
+            hint="用逗号或换行分隔；同一文字长时间停留也会判定卡住",
+        ),
+        FieldSpec("change_threshold", "画面变化灵敏度", "float", hint="建议 2.0；越大越容易判定为不动"),
+        FieldSpec("recovery", "卡住后", "choice", RECOVERY_MODES),
+        FieldSpec("process_name", "要关闭的进程名", hint="仅重启程序时填写，例如 AceRacer.exe"),
+        FieldSpec("executable", "程序 EXE 路径", "executable", hint="仅重启程序时填写"),
+        FieldSpec("arguments", "启动参数", hint="通常留空"),
+        FieldSpec("restart_wait", "重启后等待（秒）", "float", hint="等待游戏进入主界面，建议 30 到 60 秒"),
+        FieldSpec("max_restarts", "最多自动恢复次数", "int", hint="填 0 表示不限次数"),
     ],
     "loop_start": [FieldSpec("count", "循环次数", "int")],
     "loop_end": [],
@@ -205,8 +238,8 @@ class StepDialog(tk.Toplevel):
                 variable = tk.StringVar(value="" if value is None else str(value))
                 widget = ttk.Entry(self.form, textvariable=variable)
                 widget.grid(row=row, column=1, sticky="ew", pady=6)
-                if spec.kind == "file":
-                    ttk.Button(self.form, text="浏览…", command=lambda key=spec.key: self._browse_file(key)).grid(
+                if spec.kind in {"file", "executable"}:
+                    ttk.Button(self.form, text="浏览…", command=lambda key=spec.key, kind=spec.kind: self._browse_file(key, kind)).grid(
                         row=row, column=2, padx=(8, 0), pady=6
                     )
             self._widgets[spec.key] = widget
@@ -220,11 +253,16 @@ class StepDialog(tk.Toplevel):
             )
         self.help_var.set("鼠标移到字段上可查看填写提示。F10 可在流程运行时紧急停止。")
 
-    def _browse_file(self, key: str) -> None:
+    def _browse_file(self, key: str, kind: str = "file") -> None:
+        is_executable = kind == "executable"
         path = filedialog.askopenfilename(
             parent=self,
-            title="选择用于识别的小图片",
-            filetypes=[("图片文件", "*.png *.jpg *.jpeg *.bmp"), ("所有文件", "*.*")],
+            title="选择要重新启动的程序" if is_executable else "选择用于识别的小图片",
+            filetypes=(
+                [("Windows 程序", "*.exe"), ("所有文件", "*.*")]
+                if is_executable
+                else [("图片文件", "*.png *.jpg *.jpeg *.bmp"), ("所有文件", "*.*")]
+            ),
         )
         if path:
             widget = self._widgets[key]

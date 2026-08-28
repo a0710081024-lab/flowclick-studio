@@ -70,11 +70,31 @@ def validate_workflow(workflow: Workflow) -> list[ValidationIssue]:
         issues.append(ValidationIssue(None, "流程中还没有步骤"))
         return issues
 
+    watchdog_indices = [
+        index
+        for index, step in enumerate(workflow.steps)
+        if step.enabled and step.action == "watchdog"
+    ]
+    if len(watchdog_indices) > 1:
+        issues.append(ValidationIssue(watchdog_indices[1], "一个流程只能启用一个托管看门狗"))
+
     loop_map: dict[int, int] = {}
     try:
         loop_map = build_loop_map(workflow.steps)
     except ValueError as exc:
         issues.append(ValidationIssue(None, str(exc)))
+
+    labels: dict[str, int] = {}
+    for index, step in enumerate(workflow.steps):
+        if not step.enabled or step.action != "label":
+            continue
+        name = str(step.params.get("name", "")).strip()
+        if not name:
+            issues.append(ValidationIssue(index, "请填写标签名称"))
+        elif name in labels:
+            issues.append(ValidationIssue(index, f"标签“{name}”重复"))
+        else:
+            labels[name] = index
 
     for index, step in enumerate(workflow.steps):
         if not step.enabled:
@@ -136,6 +156,46 @@ def validate_workflow(workflow: Workflow) -> list[ValidationIssue]:
                     error = "图片相似度必须在 0 到 1 之间"
             except (TypeError, ValueError):
                 error = "图片相似度必须是数字"
+        elif step.action == "text_router":
+            routes = _parse_routes(p.get("routes", ""))
+            if isinstance(routes, str):
+                error = routes
+            else:
+                missing = [target for _text, target in routes if target not in labels]
+                if missing:
+                    error = f"找不到目标标签“{missing[0]}”"
+                else:
+                    source_loops = _containing_loops(index, loop_map)
+                    for _text, target in routes:
+                        target_loops = _containing_loops(labels[target], loop_map)
+                        if not target_loops.issubset(source_loops):
+                            error = f"不能从循环外跳入标签“{target}”所在的循环"
+                            break
+            if error is None:
+                error = _positive_number(p, "timeout", "检查时间")
+        elif step.action == "label":
+            if not str(p.get("name", "")).strip():
+                error = "请填写标签名称"
+        elif step.action == "watchdog":
+            error = _positive_number(p, "stuck_seconds", "卡住判定时间")
+            if error is None:
+                error = _positive_number(p, "sample_interval", "检查间隔")
+            if error is None:
+                error = _positive_number(p, "restart_wait", "重启等待时间", allow_zero=True)
+            try:
+                threshold = float(p.get("change_threshold", 2.0))
+                if threshold < 0:
+                    error = "画面变化灵敏度不能小于 0"
+                max_restarts = int(p.get("max_restarts", 10))
+                if max_restarts < 0:
+                    error = "最多自动恢复次数不能小于 0"
+            except (TypeError, ValueError):
+                error = "灵敏度和恢复次数必须是数字"
+            recovery = str(p.get("recovery", "restart_workflow"))
+            if recovery not in {"restart_workflow", "restart_program"}:
+                error = "卡住后的处理方式无效"
+            elif recovery == "restart_program" and not str(p.get("executable", "")).strip():
+                error = "选择重启程序时必须填写 EXE 路径"
         elif step.action == "loop_start":
             try:
                 if int(p.get("count", 1)) <= 0:
@@ -143,14 +203,39 @@ def validate_workflow(workflow: Workflow) -> list[ValidationIssue]:
             except (TypeError, ValueError):
                 error = "循环次数必须是整数"
 
-        if step.action in {"wait_text", "click_text", "wait_text_choice", "wait_image", "click_image"}:
+        if step.action in {"wait_text", "click_text", "wait_text_choice", "wait_image", "click_image", "text_router", "watchdog"}:
             try:
                 parse_region(p.get("region", ""))
             except ValueError as exc:
                 error = str(exc)
-            if p.get("on_timeout", "stop") not in {"stop", "skip"}:
+            if step.action != "watchdog" and p.get("on_timeout", "stop") not in {"stop", "skip"}:
                 error = "超时处理只能是停止或跳过"
 
         if error:
             issues.append(ValidationIssue(index, error))
     return issues
+
+
+def _parse_routes(value: Any) -> list[tuple[str, str]] | str:
+    routes: list[tuple[str, str]] = []
+    for raw_line in str(value or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if "=>" not in line:
+            return "页面跳转规则格式应为：文字=>标签"
+        text, target = (part.strip() for part in line.split("=>", 1))
+        if not text or not target:
+            return "页面跳转规则的文字和标签不能为空"
+        routes.append((text, target))
+    if not routes:
+        return "请至少填写一条页面跳转规则"
+    return routes
+
+
+def _containing_loops(index: int, loop_map: dict[int, int]) -> set[int]:
+    return {
+        start
+        for start, end in loop_map.items()
+        if start < end and start < index < end
+    }

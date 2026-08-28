@@ -17,6 +17,9 @@ ACTION_LABELS: dict[str, str] = {
     "wait_text_choice": "等待文字结果",
     "wait_image": "等待图片",
     "click_image": "识别图片并点击",
+    "text_router": "识别页面并跳转",
+    "label": "流程标签",
+    "watchdog": "启动托管看门狗",
     "loop_start": "循环开始",
     "loop_end": "循环结束",
     "comment": "说明",
@@ -75,6 +78,28 @@ DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
         "region": "",
         "button": "left",
         "on_timeout": "stop",
+    },
+    "text_router": {
+        "routes": "前往开箱=>开箱\n点击快速开箱=>快速开箱\n领取=>领奖\n继续=>继续\n再来一局=>再来",
+        "match": "contains",
+        "timeout": 1.5,
+        "poll": 0.3,
+        "region": "",
+        "min_score": 0.45,
+    },
+    "label": {"name": "阶段名称"},
+    "watchdog": {
+        "stuck_seconds": 60.0,
+        "sample_interval": 3.0,
+        "region": "",
+        "watch_texts": "确认出价,前往开箱,点击快速开箱,领取,继续,再来一局",
+        "change_threshold": 2.0,
+        "recovery": "restart_workflow",
+        "process_name": "",
+        "executable": "",
+        "arguments": "",
+        "restart_wait": 30.0,
+        "max_restarts": 10,
     },
     "loop_start": {"count": 2},
     "loop_end": {},
@@ -171,6 +196,17 @@ def step_summary(step: Step) -> str:
         )
     if action in {"wait_image", "click_image"}:
         return f"{p.get('path', '')} · 相似度 {p.get('confidence', 0.85)}"
+    if action == "text_router":
+        routes = [line.strip() for line in str(p.get("routes", "")).splitlines() if line.strip()]
+        return f"{len(routes)} 条页面规则 · 最长 {p.get('timeout', 0)} 秒"
+    if action == "label":
+        return str(p.get("name", ""))
+    if action == "watchdog":
+        recovery = {
+            "restart_workflow": "重启流程",
+            "restart_program": "重启程序和流程",
+        }.get(str(p.get("recovery")), str(p.get("recovery")))
+        return f"画面卡住 {p.get('stuck_seconds', 60)} 秒 → {recovery}"
     if action == "loop_start":
         return f"重复 {p.get('count', 1)} 次"
     if action == "loop_end":
